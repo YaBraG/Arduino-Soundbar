@@ -81,19 +81,23 @@ class Controller:
         Processes messages from Arduino.
         Expected format: 'BTN1', 'BTN2', etc.
         """
-        msg = msg.strip()
-        if not msg:
-            return
+        try:
+            msg = msg.strip()
+            if not msg:
+                return
 
-        print(f"[CTRL] Arduino message: {msg}")
+            print(f"[CTRL] Arduino message: {msg}")
 
-        # See if we have an audio file mapped to this button
-        if msg in self.button_mappings:
-            file_path = self.button_mappings[msg]
-            print(f"[CTRL] Playing mapped sound: {file_path}")
-            play_audio(file_path)
-        else:
-            print(f"[CTRL] No audio mapped for '{msg}'")
+            if msg in self.button_mappings:
+                file_path = self.button_mappings[msg]
+                print(f"[CTRL] Playing mapped sound: {file_path}")
+                # This is now non-blocking thanks to audio_player.py
+                play_audio(file_path)
+            else:
+                print(f"[CTRL] No audio mapped for '{msg}'")
+        except Exception as e:
+            # This prevents unexpected exceptions from killing the program
+            print(f"[CTRL ERROR] Exception while handling message '{msg}': {e}")
 
     # -------------------------------------------------------------------------
     # Run the app
