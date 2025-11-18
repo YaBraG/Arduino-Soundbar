@@ -1,111 +1,110 @@
 """
-PC-side Python script.
-Listens to Arduino over serial.
-When codes like 'BTN1' are received, plays an associated audio file.
+main.py
+Entry point of the application.
 
-Make sure to:
-- Change COM_PORT to your actual Arduino port (e.g. 'COM3' or '/dev/ttyUSB0').
-- Change AUDIO_FOLDER if needed.
+- Creates the GUI (App).
+- Sets up the serial listener when user clicks Connect.
+- When a message (e.g. 'BTN1') comes in from Arduino, plays the mapped audio file.
 """
 
-import serial           # For serial communication with Arduino
-import simpleaudio as sa  # For playing audio files
-import os               # For working with file paths
+from gui import App
+from serial_listener import SerialListener
+from audio_player import play_audio
 
-# ------------------- USER SETTINGS -------------------
 
-# Replace with your Arduino COM port
-# On Windows: something like 'COM3'
-# On Linux: something like '/dev/ttyACM0' or '/dev/ttyUSB0'
-COM_PORT = "COM3"
-
-# Baud rate must match Serial.begin() on Arduino
-BAUD_RATE = 9600
-
-# Folder where your audio files live
-AUDIO_FOLDER = r"C:\soundboard"
-
-# Map Arduino messages to audio file names
-# e.g. if Arduino sends "BTN1", we play BTN1.wav
-button_to_file = {
-    "BTN1": "BTN1.wav",
-    "BTN2": "BTN2.wav",
-    "BTN3": "BTN3.wav",
-    "BTN4": "BTN4.wav",
-}
-
-# ------------------- FUNCTIONS -------------------
-
-def play_sound(filename):
+class Controller:
     """
-    Plays the given WAV file (blocking) using simpleaudio.
+    High-level controller that connects GUI, serial listener, and audio playback.
     """
-    file_path = os.path.join(AUDIO_FOLDER, filename)
 
-    if not os.path.isfile(file_path):
-        print(f"[WARN] Audio file not found: {file_path}")
-        return
+    def __init__(self):
+        # No serial listener until user clicks Connect
+        self.serial_listener = None
 
-    try:
-        # Load WAV file into memory
-        wave_obj = sa.WaveObject.from_wave_file(file_path)
-        # Start playback
-        play_obj = wave_obj.play()
-        # Optionally, wait for playback to finish
-        # Comment out the next line if you want non-blocking behavior
-        play_obj.wait_done()
-    except Exception as e:
-        print(f"[ERROR] Failed to play {file_path}: {e}")
+        # Dictionary like: 'BTN1' -> 'C:\\path\\to\\sound1.wav'
+        self.button_mappings = {}
 
+        # Create GUI and pass callbacks
+        self.app = App(
+            on_connect=self.handle_connect,
+            on_disconnect=self.handle_disconnect,
+            on_update_mappings=self.handle_update_mappings
+        )
 
-def main():
-    """
-    Main loop:
-    - Open serial port
-    - Read text lines from Arduino
-    - When a known button code is received, play the corresponding sound
-    """
-    print(f"[INFO] Opening serial port {COM_PORT} at {BAUD_RATE} baud...")
-    try:
-        ser = serial.Serial(COM_PORT, BAUD_RATE, timeout=1)
-    except Exception as e:
-        print(f"[ERROR] Could not open serial port {COM_PORT}: {e}")
-        return
+    # -------------------------------------------------------------------------
+    # GUI callbacks
+    # -------------------------------------------------------------------------
+    def handle_connect(self, port, mappings):
+        """
+        Called by the GUI when user clicks Connect.
+        :param port: Selected COM port (e.g. 'COM3')
+        :param mappings: Current button -> file path mapping
+        :return: True on success, False otherwise
+        """
+        print(f"[CTRL] Connecting to {port}...")
+        self.button_mappings = mappings
 
-    print("[INFO] Serial port opened. Waiting for button presses...")
-    print("[INFO] Press Ctrl+C to exit.\n")
+        # Define how to handle a line coming from the Arduino
+        def on_serial_line(line):
+            # Delegate message handling to the GUI-safe method
+            self.app.handle_serial_message(line)
+            self._handle_arduino_message(line)
 
-    try:
-        while True:
-            # Read a line from Serial (as bytes)
-            line_bytes = ser.readline()
+        # Create and start serial listener
+        self.serial_listener = SerialListener(port=port, baud_rate=9600, line_callback=on_serial_line)
+        ok = self.serial_listener.start()
+        if not ok:
+            self.serial_listener = None
+        return ok
 
-            # If nothing was read (timeout), continue the loop
-            if not line_bytes:
-                continue
+    def handle_disconnect(self):
+        """
+        Called by the GUI when user clicks Disconnect.
+        """
+        print("[CTRL] Disconnect requested.")
+        if self.serial_listener:
+            self.serial_listener.stop()
+            self.serial_listener = None
 
-            # Convert from bytes to string and strip whitespace/newline
-            line = line_bytes.decode(errors="ignore").strip()
+    def handle_update_mappings(self, mappings):
+        """
+        Called by the GUI whenever button -> file mappings change.
+        """
+        print("[CTRL] Updating mappings.")
+        self.button_mappings = mappings
 
-            if not line:
-                continue
+    # -------------------------------------------------------------------------
+    # Arduino messages
+    # -------------------------------------------------------------------------
+    def _handle_arduino_message(self, msg):
+        """
+        Processes messages from Arduino.
+        Expected format: 'BTN1', 'BTN2', etc.
+        """
+        msg = msg.strip()
+        if not msg:
+            return
 
-            print(f"[DEBUG] Received from Arduino: '{line}'")
+        print(f"[CTRL] Arduino message: {msg}")
 
-            # Check if the received message maps to an audio file
-            if line in button_to_file:
-                filename = button_to_file[line]
-                print(f"[INFO] Playing sound for {line}: {filename}")
-                play_sound(filename)
-            else:
-                print(f"[WARN] Unrecognized code: '{line}'")
+        # See if we have an audio file mapped to this button
+        if msg in self.button_mappings:
+            file_path = self.button_mappings[msg]
+            print(f"[CTRL] Playing mapped sound: {file_path}")
+            play_audio(file_path)
+        else:
+            print(f"[CTRL] No audio mapped for '{msg}'")
 
-    except KeyboardInterrupt:
-        print("\n[INFO] Exiting by user request.")
-    finally:
-        ser.close()
-        print("[INFO] Serial port closed.")
+    # -------------------------------------------------------------------------
+    # Run the app
+    # -------------------------------------------------------------------------
+    def run(self):
+        """
+        Starts the Tkinter main loop.
+        """
+        self.app.mainloop()
 
 
 if __name__ == "__main__":
-    main()
+    controller = Controller()
+    controller.run()
