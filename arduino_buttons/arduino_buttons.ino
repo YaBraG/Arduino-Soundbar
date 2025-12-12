@@ -7,7 +7,7 @@
   Match the number of buttons you configure in the PC app.
 */
 
-const int buttonPins[] = {2, 3, 4, 5};  // Change / extend as needed
+const int buttonPins[] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11};  // Change / extend as needed
 const int numButtons  = sizeof(buttonPins) / sizeof(buttonPins[0]);
 
 int lastState[numButtons];
