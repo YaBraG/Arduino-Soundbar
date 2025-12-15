@@ -15,6 +15,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 from config_manager import load_config, save_config
+from version import APP_NAME, APP_VERSION
+
 
 try:
     # Import only for listing ports in the GUI
@@ -35,7 +37,7 @@ class App(tk.Tk):
         :param on_update_mappings: callback(mappings) when button mappings change
         """
         super().__init__()
-        self.title("Arduino Audio Stream Deck")
+        self.title(f"{APP_NAME} {APP_VERSION}")
 
         # Store callbacks
         self._on_connect = on_connect
