@@ -1,0 +1,6 @@
+$Owner     = "YaBraG"
+$Repo      = "Arduino-Soundbar"
+$AssetName = "ArduinoSoundbar-win64.zip"
+$AppName   = "Arduino Soundbar"
+$ExeName   = "Soundbar.exe"
+$ConfigName = "config.json"
