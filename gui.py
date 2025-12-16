@@ -39,10 +39,14 @@ class App(tk.Tk):
         :param on_update_mappings: callback(mappings) when button mappings change
         """
         super().__init__()
-        # Set window icon (fixes Tk "feather" title-bar icon)
+
+        self.title(f"{APP_NAME} {APP_VERSION}")
+        
+        # Set window icon (fixes Tk "feather" title icon)
         try:
+            import os, sys
             if getattr(sys, "frozen", False):
-                base_dir = os.path.dirname(sys.executable)  # installed folder (best for onefile)
+                base_dir = os.path.dirname(sys.executable)
             else:
                 base_dir = os.path.abspath(".")
 
@@ -51,7 +55,6 @@ class App(tk.Tk):
                 self.iconbitmap(icon_path)
         except Exception as e:
             print(f"[GUI] Could not set icon: {e}")
-
 
         # Store callbacks
         self._on_connect = on_connect
