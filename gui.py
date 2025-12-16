@@ -11,6 +11,8 @@ by main.py so things stay modular.
 """
 
 import os
+import sys
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
@@ -37,6 +39,15 @@ class App(tk.Tk):
         :param on_update_mappings: callback(mappings) when button mappings change
         """
         super().__init__()
+        if getattr(sys, "frozen", False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.abspath(".")
+        
+        icon_path = os.path.join(base_path, "icon.ico")
+        if os.path.exists(icon_path):
+            self.iconbitmap(icon_path)
+
         self.title(f"{APP_NAME} {APP_VERSION}")
 
         # Store callbacks
