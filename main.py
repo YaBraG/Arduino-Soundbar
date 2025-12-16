@@ -13,7 +13,7 @@ Entry point of the application.
 import os
 from gui import App
 from serial_listener import SerialListener
-from audio_player import play_audio
+from audio_player import play_audio, stop_all_audio  # stop audio on toggle
 
 
 class Controller:
@@ -96,6 +96,9 @@ class Controller:
             if self.toggle_button_id and msg == self.toggle_button_id:
                 self.stop_mode = "ANY" if self.stop_mode == "SAME" else "SAME"
                 print(f"[CTRL] Toggled stop mode -> {self.stop_mode}")
+                
+                stop_all_audio()  # stop any ongoing audio when toggling modes
+
 
                 # Update GUI label + persist config
                 if hasattr(self.app, "set_stop_mode"):
