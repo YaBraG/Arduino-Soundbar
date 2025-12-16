@@ -256,7 +256,7 @@ class App(tk.Tk):
         if not self.audio_folder or not os.path.isdir(self.audio_folder):
             return []
 
-        allowed_exts = {".wav"}  # You can expand this set if desired
+        allowed_exts = {".wav", ".mp3", ".ogg", ".flac", ".m4a", ".aac", ".wma"}
         files = []
         for name in os.listdir(self.audio_folder):
             full_path = os.path.join(self.audio_folder, name)

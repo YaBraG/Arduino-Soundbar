@@ -1,20 +1,24 @@
-"""
-Plays WAV audio files on Windows using the built-in winsound module.
-Playback is asynchronous so it does not block the GUI or serial listener.
-"""
-
 import os
-import winsound  # Windows-only standard library module
 
+# Try pygame for multi-format playback
+try:
+    import pygame
+    _PYGAME_OK = True
+except Exception:
+    _PYGAME_OK = False
+
+import winsound  # wav-only fallback
+
+_pygame_inited = False
+
+def _init_pygame():
+    global _pygame_inited
+    if _PYGAME_OK and not _pygame_inited:
+        pygame.mixer.init()
+        _pygame_inited = True
 
 def play_audio(file_path: str) -> None:
-    """
-    Play the given WAV file asynchronously.
-
-    :param file_path: Absolute path to a .wav file.
-    """
     try:
-        # Ensure we got a valid path
         if not file_path:
             print("[AUDIO] No file path provided.")
             return
@@ -23,16 +27,21 @@ def play_audio(file_path: str) -> None:
             print(f"[AUDIO] File does not exist: {file_path}")
             return
 
+        ext = os.path.splitext(file_path)[1].lower()
         print(f"[AUDIO] Playing: {file_path}")
 
-        # winsound.PlaySound:
-        # - SND_FILENAME: treat the string as a filename
-        # - SND_ASYNC: return immediately, play in the background
-        winsound.PlaySound(
-            file_path,
-            winsound.SND_FILENAME | winsound.SND_ASYNC
-        )
+        # Use pygame when available (supports many formats)
+        if _PYGAME_OK:
+            _init_pygame()
+            pygame.mixer.music.load(file_path)
+            pygame.mixer.music.play()
+            return
+
+        # Fallback: winsound only for wav
+        if ext == ".wav":
+            winsound.PlaySound(file_path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+        else:
+            print("[AUDIO] Non-wav file but pygame not available. Install pygame to play this format.")
 
     except Exception as e:
-        # Any exception here will be printed but NOT kill the program
         print(f"[AUDIO ERROR] Failed to play '{file_path}': {e}")
