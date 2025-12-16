@@ -7,6 +7,7 @@ Entry point of the application.
 - When a message (e.g. 'BTN1') comes in from Arduino, plays the mapped audio file.
 """
 
+import os
 from gui import App
 from serial_listener import SerialListener
 from audio_player import play_audio
@@ -89,10 +90,18 @@ class Controller:
             print(f"[CTRL] Arduino message: {msg}")
 
             if msg in self.button_mappings:
-                file_path = self.button_mappings[msg]
+                mapped = self.button_mappings[msg]
+
+                # If it's already an absolute path (backward compatibility), use it
+                if os.path.isabs(mapped):
+                    file_path = mapped
+                else:
+                    # New behavior: mapping is just a filename
+                    file_path = os.path.join(self.app.audio_folder, mapped)
+
                 print(f"[CTRL] Playing mapped sound: {file_path}")
-                # This is now non-blocking thanks to audio_player.py
                 play_audio(file_path)
+
             else:
                 print(f"[CTRL] No audio mapped for '{msg}'")
         except Exception as e:

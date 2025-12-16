@@ -296,10 +296,12 @@ class App(tk.Tk):
         Loads button -> filename mappings from config and applies them to the GUI.
         """
         stored = self.config_data.get("button_files", {})
-        for btn_id, filename in stored.items():
+        for btn_id, value in stored.items():
             var = self.button_file_vars.get(btn_id)
-            if var is not None:
-                var.set(filename)
+            if var is not None and value:
+                # Migrate old configs that stored absolute paths
+                var.set(os.path.basename(value))
+
 
         # Also repopulate combos in case we changed folder
         self._populate_all_combos()
@@ -318,14 +320,15 @@ class App(tk.Tk):
 
     def get_button_mappings(self):
         """
-        Returns a dictionary mapping 'BTN1' -> absolute file path, etc.
+        Returns a dictionary mapping 'BTN1' -> filename (NOT full path).
+        We store only filenames in config so they remain portable.
         """
         mappings = {}
         for btn_id, var in self.button_file_vars.items():
-            filename = var.get().strip()
-            if filename:
-                full_path = os.path.join(self.audio_folder, filename)
-                mappings[btn_id] = full_path
+            value = var.get().strip()
+            if value:
+                # If older config stored full paths, migrate to filename
+                mappings[btn_id] = os.path.basename(value)
         return mappings
 
     # -------------------------------------------------------------------------
