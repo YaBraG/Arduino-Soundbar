@@ -67,6 +67,7 @@ class App(tk.Tk):
 
         # Initially build the button rows
         self._rebuild_button_rows()
+        self._schedule_auto_refresh_files()
 
         # Apply stored button file mappings from config
         self._apply_stored_mappings()
@@ -227,6 +228,7 @@ class App(tk.Tk):
             # The “slider” behavior is approximated by a readonly combo of files
             combo = ttk.Combobox(row, textvariable=var, width=40, state="readonly")
             combo.pack(side="left", padx=5, pady=2, expand=True, fill="x")
+            combo.bind("<Button-1>", lambda e: self._populate_all_combos())
 
             select_btn = ttk.Button(row, text="Select audio", command=lambda btn_id=f"BTN{i}": self._select_audio_for_button(btn_id))
             select_btn.pack(side="left", padx=5, pady=2)
@@ -398,3 +400,8 @@ class App(tk.Tk):
         Right now it just logs; main.py will attach actual behavior.
         """
         print(f"[GUI] Received from Arduino: {msg}")
+
+    def _schedule_auto_refresh_files(self):
+        """Periodically refresh audio file lists so new files appear in dropdowns."""
+        self._populate_all_combos()
+        self.after(2000, self._schedule_auto_refresh_files)  # every 2 seconds
