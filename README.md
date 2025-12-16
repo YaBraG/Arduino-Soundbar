@@ -1,195 +1,154 @@
-# 🎧 Arduino Audio Stream Deck (Arduino Soundbar)
+Perfect timing — here is a **clean, up-to-date README.md** that matches **v1.0.5**, the current behavior, and how you actually ship/test the project.
 
-A customizable **hardware soundboard** that uses an Arduino Uno/Nano and a Windows desktop application.
-Press a physical button → Arduino sends a serial message → the PC instantly plays the assigned audio file.
-
-This project is built to be simple, modular, and stable when compiled into a Windows `.exe`.
+You can **replace your README.md entirely** with this.
 
 ---
 
-## 🚀 Features
+````markdown
+# Arduino Soundbar
 
-### PC Application
-- Tkinter-based GUI
-- Select any folder containing **WAV** audio files
-- Adjustable number of buttons (1–32)
-- Each button can be assigned a different WAV file
-- Drop-down selection of available COM ports (similar to Arduino IDE)
-- Automatically remembers:
-  - Last selected audio folder
-  - Button → audio mappings
-  - Number of buttons
-  - Last used COM port
-- Uses **winsound** for stable non-blocking audio playback inside `.exe`
-- No crashes when audio finishes (fixed)
+Arduino Soundbar is a desktop application that turns an Arduino into a customizable soundboard.  
+Each Arduino button triggers an audio file on the PC with ultra-fast response, reliable overlap behavior, and flexible stop modes.
 
-### Arduino
-- Uses digital pins with `INPUT_PULLUP`
-- Sends messages like `BTN1`, `BTN2`, `BTN3` over Serial
-- Debounced and triggers only once per physical press
+Designed for **low latency**, **rapid retriggering**, and **stable multi-button playback**.
 
 ---
 
-## ✅ Windows Install (Recommended)
+## ✨ Features
 
-### Install
-1. Go to this repository’s **Releases** page.
-2. Download **Install_ArduinoSoundbar.bat** (from the latest release assets).
-3. Double-click it.
-4. Press **ENTER** to install to the default location, or type a custom folder:
-   - Default: `Documents\Arduino Soundbar`
-5. A **Desktop shortcut** will be created automatically.
-
-> Windows may show a “Protected your PC” warning because the app is not code-signed.
-> Click **More info** → **Run anyway**.
-
-### Update
-To update to the latest version, simply run **Install_ArduinoSoundbar.bat** again.
+- 🎛️ Map Arduino buttons (BTN1, BTN2, etc.) to audio files
+- 🔊 True audio overlap across different buttons
+- ⚡ Fast retrigger on the same button (instant restart)
+- 🔁 Toggle between stop modes using a dedicated Arduino button
+- 🖥️ Simple GUI for configuration
+- 📦 Standalone `.exe` build (no Python required for users)
 
 ---
 
-## 🧩 System Architecture
+## 🎚️ Stop Modes
 
-```
+The app supports two playback modes:
 
-[Buttons] → [Arduino] → USB Serial → [PC Stream Deck App] → [WAV Playback]
+### SAME (Overlap Mode)
+- Pressing the **same button** restarts its sound
+- Pressing **different buttons** allows sounds to overlap
+- Best for soundboards and layered effects
 
-```
+### ANY (Exclusive Mode)
+- Any button press stops all currently playing audio
+- Only one sound plays at a time
 
-- Arduino handles hardware button presses.
-- The PC app plays the corresponding audio.
-
----
-
-## 📁 Project Structure
-
-```
-
-Arduino-Soundbar/
-├─ main.py                     # Entry point: ties GUI, Serial Listener, Audio Player
-├─ gui.py                      # Tkinter GUI (folder selection, mappings, COM ports)
-├─ serial_listener.py          # Background thread that reads Arduino serial data
-├─ audio_player.py             # Plays WAV files using winsound (non-blocking)
-├─ config_manager.py           # Saves/loads config.json (next to the .exe)
-├─ version.py                  # App name + version displayed in the title bar
-├─ config.default.json         # Clean default config template (repo only)
-├─ Install_ArduinoSoundbar.bat # One-click installer launcher (user downloads this)
-├─ Install_ArduinoSoundbar.ps1 # Installer logic (downloads release zip, makes shortcut)
-├─ requirements.txt            # Runtime deps (pyserial)
-├─ README.md
-└─ arduino_buttons.ino         # Arduino firmware for Uno/Nano
-
-```
+### Toggle Button
+- A dedicated Arduino button can toggle between `SAME` and `ANY`
+- **Pressing the toggle button immediately stops all audio** (v1.0.5)
 
 ---
 
-## 🔌 Arduino Hardware Setup
+## 🔊 Audio Engine (Important)
 
-### Components
-- Arduino Uno or Nano
-- One momentary push button per audio trigger
-- Jumper wires
-- USB cable
-- (Optional) custom enclosure
+- Uses `pygame.mixer`
+- Each button is assigned a **dedicated audio channel**
+- Prevents channel stealing and random cutoffs under rapid presses
+- Audio files are cached for instant replay
 
-### Wiring
-Each button goes between an Arduino pin and **GND**.
-
-Example for 4 buttons:
-
-```
-
-Pin 2 ----[Button]---- GND
-Pin 3 ----[Button]---- GND
-Pin 4 ----[Button]---- GND
-Pin 5 ----[Button]---- GND
-
-````
-
-Arduino code uses internal pull-ups:
-
-```cpp
-pinMode(pin, INPUT_PULLUP);
-````
-
-Logic:
-
-* Not pressed → HIGH
-* Pressed → LOW
-* On press: Arduino sends `"BTN1"`, `"BTN2"`, …
-
-The full code is in `arduino_buttons.ino`.
+Supported formats depend on pygame (commonly `.wav`, `.mp3`, `.ogg`).
 
 ---
 
-## 🎚️ Using the Application
+## 🧪 Tested Scenarios
 
-### Step 1 — Select Audio Folder
+- Rapidly spamming the same button
+- Rapidly alternating between two buttons
+- Holding one button while spamming another
+- Toggling modes during playback
 
-Choose a folder containing your `.wav` sound files.
-The app remembers this folder on the next launch.
-
-### Step 2 — Select Arduino COM Port
-
-Use the COM drop-down to select the connected board.
-
-### Step 3 — Set Number of Buttons
-
-Choose how many hardware buttons your Arduino has.
-
-### Step 4 — Assign Audio Files
-
-For each button:
-
-* Pick a WAV file from the drop-down, or
-* Use “Select audio” to browse for a WAV file
-
-### Step 5 — Connect
-
-The application starts listening for Arduino serial messages.
-
-### Step 6 — Press Physical Buttons
-
-The corresponding WAV file plays immediately (non-blocking, no crashes).
+All tested scenarios behave deterministically as of **v1.0.5**.
 
 ---
 
-## 🛠️ Developer Setup (Optional)
+## 🖥️ Running from Source (Developers)
 
-> Users should install from **Releases** using the one-click installer.
-> This section is only for developers who want to run from source or build locally.
+### Requirements
+- Python 3.10+
+- Windows (pygame + winsound fallback)
 
-### Run from source
-
-```bash
+Install dependencies:
+```powershell
 pip install -r requirements.txt
+````
+
+Run:
+
+```powershell
 python main.py
 ```
 
-### Build the Windows Executable (PyInstaller)
+---
 
-```bash
-pip install pyinstaller
-pyinstaller --onefile --noconsole --name Soundbar main.py
+## 📦 Building the EXE (Windows)
+
+Clean build + icon:
+
+```powershell
+pyinstaller --noconfirm --clean --onefile --noconsole `
+  --name "Soundbar" `
+  --icon "icon.ico" `
+  main.py
 ```
 
-The executable appears in:
+After building:
 
-```
-dist/Soundbar.exe
-```
-
-At runtime the application creates:
-
-```
-config.json
+```powershell
+Copy-Item ".\icon.ico" ".\dist\icon.ico" -Force
 ```
 
-next to the `.exe` on first run.
+Output:
+
+```
+dist/
+ ├─ Soundbar.exe
+ └─ icon.ico
+```
 
 ---
 
-## 📜 License
+## 🧾 Version History
 
-This project is released under the **MIT License**.
-See `LICENSE` file for details.
+### v1.0.5
+
+* Stop any ongoing audio when the toggle button is pressed
+
+### v1.0.4
+
+* Fix overlap mode where some sounds failed to overlap under rapid presses
+* Assign dedicated pygame audio channels per button (BTN1, BTN2, etc.)
+* Preserve fast retrigger behavior while allowing true cross-button overlap
+* Improve mixer stability by pre-allocating channels
+
+### v1.0.3
+
+* Fix dropdown mappings and path resolution
+* Auto-refresh audio dropdowns
+* Multi-format audio playback
+* Updated Windows icon support
+
+---
+
+## 📌 Notes
+
+* `dist/` and `build/` folders are **not committed** to GitHub
+* `.exe` files are distributed via **GitHub Releases**
+* Arduino firmware only needs to send `BTN#` messages over serial
+
+---
+
+## 📬 Feedback & Testing
+
+If something breaks:
+
+* Note which button(s)
+* Stop mode (`SAME` / `ANY`)
+* Audio format
+* Whether the toggle button was involved
+
+This helps isolate timing or hardware edge cases quickly.
