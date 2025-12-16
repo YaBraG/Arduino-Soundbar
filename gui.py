@@ -246,6 +246,7 @@ class App(tk.Tk):
             combo = ttk.Combobox(row, textvariable=var, width=40, state="readonly")
             combo.pack(side="left", padx=5, pady=2, expand=True, fill="x")
             combo.bind("<Button-1>", lambda e: self._populate_all_combos())
+            combo.bind("<<ComboboxSelected>>", self._on_dropdown_selected)
 
             select_btn = ttk.Button(row, text="Select audio", command=lambda btn_id=f"BTN{i}": self._select_audio_for_button(btn_id))
             select_btn.pack(side="left", padx=5, pady=2)
@@ -282,6 +283,13 @@ class App(tk.Tk):
                 if ext.lower() in allowed_exts:
                     files.append(name)
         return files
+
+    def _on_dropdown_selected(self, event=None):
+        """
+        Called when a dropdown selection is made.
+        This updates config + notifies main immediately so playback works without reconnecting.
+        """
+        self._notify_mappings_changed()
 
     def _select_audio_for_button(self, btn_id):
         """
@@ -422,3 +430,4 @@ class App(tk.Tk):
         """Periodically refresh audio file lists so new files appear in dropdowns."""
         self._populate_all_combos()
         self.after(2000, self._schedule_auto_refresh_files)  # every 2 seconds
+
