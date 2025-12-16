@@ -19,7 +19,6 @@ from tkinter import ttk, filedialog, messagebox
 from config_manager import load_config, save_config
 from version import APP_NAME, APP_VERSION
 
-
 try:
     # Import only for listing ports in the GUI
     from serial.tools import list_ports
@@ -41,10 +40,9 @@ class App(tk.Tk):
         super().__init__()
 
         self.title(f"{APP_NAME} {APP_VERSION}")
-        
+
         # Set window icon (fixes Tk "feather" title icon)
         try:
-            import os, sys
             if getattr(sys, "frozen", False):
                 base_dir = os.path.dirname(sys.executable)
             else:
@@ -68,6 +66,10 @@ class App(tk.Tk):
         self.audio_folder = self.config_data.get("audio_folder", "")
         self.num_buttons = tk.IntVar(value=self.config_data.get("num_buttons", 4))
         self.connected = False
+
+        # NEW: Stop mode + toggle button selection
+        self.stop_mode_var = tk.StringVar(value=self.config_data.get("stop_mode", "SAME"))
+        self.toggle_btn_var = tk.StringVar(value=self.config_data.get("toggle_button_id", ""))
 
         # Will hold Tkinter StringVars for each button's selected file
         self.button_file_vars = {}
@@ -96,9 +98,6 @@ class App(tk.Tk):
     # Folder section
     # -------------------------------------------------------------------------
     def _create_folder_section(self):
-        """
-        Creates the section of the GUI related to choosing the audio folder.
-        """
         frame = ttk.LabelFrame(self, text="Audio Folder")
         frame.pack(fill="x", padx=10, pady=5)
 
@@ -111,12 +110,8 @@ class App(tk.Tk):
         btn.pack(side="right", padx=5, pady=5)
 
     def _select_audio_folder(self):
-        """
-        Opens a folder selection dialog and updates the audio folder.
-        """
         new_folder = filedialog.askdirectory(title="Select Folder Containing Audio Files")
         if not new_folder:
-            # User cancelled the dialog
             return
 
         self.audio_folder = new_folder
@@ -126,17 +121,12 @@ class App(tk.Tk):
         self.config_data["audio_folder"] = self.audio_folder
         save_config(self.config_data)
 
-        # After changing folder, we may want to reset button selections
-        # (optional, here we just notify mappings changed).
         self._notify_mappings_changed()
 
     # -------------------------------------------------------------------------
-    # COM port section
+    # COM port section (+ NEW toggle controls)
     # -------------------------------------------------------------------------
     def _create_port_section(self):
-        """
-        Creates the COM port selection section.
-        """
         frame = ttk.LabelFrame(self, text="Arduino Port")
         frame.pack(fill="x", padx=10, pady=5)
 
@@ -148,23 +138,72 @@ class App(tk.Tk):
         refresh_btn = ttk.Button(frame, text="Refresh", command=self._refresh_ports)
         refresh_btn.pack(side="left", padx=5, pady=5)
 
+        # NEW: Toggle button selection
+        ttk.Label(frame, text="Toggle BTN:").pack(side="left", padx=(15, 2), pady=5)
+        toggle_options = [""] + [f"BTN{i}" for i in range(1, 33)]
+        self.toggle_combo = ttk.Combobox(frame, state="readonly", width=7,
+                                         textvariable=self.toggle_btn_var,
+                                         values=toggle_options)
+        self.toggle_combo.pack(side="left", padx=5, pady=5)
+        self.toggle_combo.bind("<<ComboboxSelected>>", lambda e: self._save_toggle_settings())
+
+        # NEW: Stop mode display (read-only label)
+        self.mode_label_var = tk.StringVar(value=self._mode_label_text(self.stop_mode_var.get()))
+        mode_lbl = ttk.Label(frame, textvariable=self.mode_label_var)
+        mode_lbl.pack(side="left", padx=(15, 5), pady=5)
+
         # Load last used port if available
         last_port = self.config_data.get("last_port", "")
         self._refresh_ports(select_port=last_port)
 
+        # Ensure UI reflects loaded config
+        self._save_toggle_settings(save_only=True)
+
+    def _mode_label_text(self, mode: str) -> str:
+        if mode == "ANY":
+            return "Mode: ANY (stop all)"
+        return "Mode: SAME (overlap)"
+
+    def _save_toggle_settings(self, save_only: bool = False):
+        """
+        Save toggle button + stop mode to config.
+        """
+        self.config_data["toggle_button_id"] = self.toggle_btn_var.get().strip()
+        self.config_data["stop_mode"] = self.stop_mode_var.get().strip() or "SAME"
+        save_config(self.config_data)
+
+        # Keep label updated
+        self.mode_label_var.set(self._mode_label_text(self.stop_mode_var.get()))
+
+        # Optionally notify main that settings changed
+        if not save_only and self._on_update_mappings:
+            self._on_update_mappings(self.get_button_mappings())
+
+    def set_stop_mode(self, mode: str):
+        """
+        Called by main.py when the toggle button is pressed.
+        Updates GUI + saves config.
+        """
+        if mode not in ("SAME", "ANY"):
+            return
+        self.stop_mode_var.set(mode)
+        self._save_toggle_settings(save_only=True)
+
+    def get_toggle_button_id(self) -> str:
+        return self.toggle_btn_var.get().strip()
+
+    def get_stop_mode(self) -> str:
+        mode = self.stop_mode_var.get().strip()
+        return mode if mode in ("SAME", "ANY") else "SAME"
+
     def _refresh_ports(self, select_port=None):
-        """
-        Refreshes the list of available COM ports and optionally selects one.
-        """
         ports_display = []
         ports_values = []
 
         if list_ports is None:
-            # If pyserial.tools.list_ports is not available
             self.port_combo["values"] = []
         else:
             for p in list_ports.comports():
-                # Example: "COM3 - Arduino Uno"
                 display = f"{p.device} - {p.description}"
                 ports_display.append(display)
                 ports_values.append(p.device)
@@ -172,7 +211,6 @@ class App(tk.Tk):
         self.port_display_to_value = dict(zip(ports_display, ports_values))
         self.port_combo["values"] = ports_display
 
-        # Try to reselect the given port if it's still available
         if select_port:
             for display, value in self.port_display_to_value.items():
                 if value == select_port:
@@ -180,9 +218,6 @@ class App(tk.Tk):
                     break
 
     def get_selected_port(self):
-        """
-        Returns the selected port (e.g. 'COM3') or '' if none.
-        """
         display = self.port_combo.get()
         if not display:
             return ""
@@ -192,85 +227,63 @@ class App(tk.Tk):
     # Button mapping section
     # -------------------------------------------------------------------------
     def _create_buttons_section(self):
-        """
-        Creates the section where the user chooses number of buttons and audio files.
-        """
         outer_frame = ttk.LabelFrame(self, text="Buttons / Audio Mapping")
         outer_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Row for number of buttons
         top_row = ttk.Frame(outer_frame)
         top_row.pack(fill="x", pady=5)
 
         ttk.Label(top_row, text="Number of buttons:").pack(side="left", padx=5)
-        spin = ttk.Spinbox(top_row, from_=1, to=32, width=5, textvariable=self.num_buttons, command=self._on_num_buttons_changed)
+        spin = ttk.Spinbox(
+            top_row, from_=1, to=32, width=5, textvariable=self.num_buttons,
+            command=self._on_num_buttons_changed
+        )
         spin.pack(side="left", padx=5)
 
-        # Frame to contain the button rows
         self.buttons_frame = ttk.Frame(outer_frame)
         self.buttons_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
     def _on_num_buttons_changed(self):
-        """
-        Called when the user changes the number of buttons.
-        Rebuilds the button mapping rows.
-        """
         self._rebuild_button_rows()
-        # Update config
         self.config_data["num_buttons"] = int(self.num_buttons.get())
         save_config(self.config_data)
         self._notify_mappings_changed()
 
     def _rebuild_button_rows(self):
-        """
-        Clears and recreates the button mapping rows according to num_buttons.
-        """
-        # Clear existing rows
         for child in self.buttons_frame.winfo_children():
             child.destroy()
 
         self.button_file_vars.clear()
 
-        # Create new rows
         for i in range(1, int(self.num_buttons.get()) + 1):
             row = ttk.Frame(self.buttons_frame)
             row.pack(fill="x", pady=2)
 
-            btn_label_text = f"Btn {i}:"
-            ttk.Label(row, text=btn_label_text, width=10).pack(side="left", padx=5)
+            ttk.Label(row, text=f"Btn {i}:", width=10).pack(side="left", padx=5)
 
             var = tk.StringVar(value="")
             self.button_file_vars[f"BTN{i}"] = var
 
-            # The “slider” behavior is approximated by a readonly combo of files
             combo = ttk.Combobox(row, textvariable=var, width=40, state="readonly")
             combo.pack(side="left", padx=5, pady=2, expand=True, fill="x")
             combo.bind("<Button-1>", lambda e: self._populate_all_combos())
             combo.bind("<<ComboboxSelected>>", self._on_dropdown_selected)
 
-            select_btn = ttk.Button(row, text="Select audio", command=lambda btn_id=f"BTN{i}": self._select_audio_for_button(btn_id))
+            select_btn = ttk.Button(row, text="Select audio",
+                                    command=lambda btn_id=f"BTN{i}": self._select_audio_for_button(btn_id))
             select_btn.pack(side="left", padx=5, pady=2)
 
-        # Populate combos with current folder's files
         self._populate_all_combos()
 
     def _populate_all_combos(self):
-        """
-        Updates each button's dropdown with the list of audio files in the folder.
-        """
         files = self._list_audio_files_in_folder()
         for btn_id, var in self.button_file_vars.items():
-            # Find the Combobox widget associated with this variable
             for row in self.buttons_frame.winfo_children():
                 combo_boxes = [w for w in row.winfo_children() if isinstance(w, ttk.Combobox)]
                 if combo_boxes and combo_boxes[0].cget("textvariable") == str(var):
                     combo_boxes[0]["values"] = files
 
     def _list_audio_files_in_folder(self):
-        """
-        Returns a list of audio file names in the current audio folder.
-        Currently filters by extension (.wav only for simplicity).
-        """
         if not self.audio_folder or not os.path.isdir(self.audio_folder):
             return []
 
@@ -285,59 +298,41 @@ class App(tk.Tk):
         return files
 
     def _on_dropdown_selected(self, event=None):
-        """
-        Called when a dropdown selection is made.
-        This updates config + notifies main immediately so playback works without reconnecting.
-        """
         self._notify_mappings_changed()
 
     def _select_audio_for_button(self, btn_id):
-        """
-        Allows the user to pick a specific file for a single button
-        by opening a file dialog starting in the audio folder.
-        """
         if not self.audio_folder:
             messagebox.showwarning("No Folder", "Please select an audio folder first.")
             return
 
-        # File dialog restricted to audio folder
         file_path = filedialog.askopenfilename(
             title=f"Select audio for {btn_id}",
             initialdir=self.audio_folder,
-            filetypes=[("WAV files", "*.wav"), ("All files", "*.*")]
+            filetypes=[
+                ("Audio files", "*.wav;*.mp3;*.ogg;*.flac;*.m4a;*.aac;*.wma"),
+                ("All files", "*.*")
+            ]
         )
         if not file_path:
             return
 
-        # Only store the file name, not full path
         filename = os.path.basename(file_path)
 
-        # Set the corresponding StringVar
         var = self.button_file_vars.get(btn_id)
         if var is not None:
             var.set(filename)
             self._notify_mappings_changed()
 
     def _apply_stored_mappings(self):
-        """
-        Loads button -> filename mappings from config and applies them to the GUI.
-        """
         stored = self.config_data.get("button_files", {})
         for btn_id, value in stored.items():
             var = self.button_file_vars.get(btn_id)
             if var is not None and value:
-                # Migrate old configs that stored absolute paths
                 var.set(os.path.basename(value))
 
-
-        # Also repopulate combos in case we changed folder
         self._populate_all_combos()
 
     def _notify_mappings_changed(self):
-        """
-        Called whenever button mappings change.
-        Updates config and notifies main via callback.
-        """
         mappings = self.get_button_mappings()
         self.config_data["button_files"] = mappings
         save_config(self.config_data)
@@ -346,15 +341,10 @@ class App(tk.Tk):
             self._on_update_mappings(mappings)
 
     def get_button_mappings(self):
-        """
-        Returns a dictionary mapping 'BTN1' -> filename (NOT full path).
-        We store only filenames in config so they remain portable.
-        """
         mappings = {}
         for btn_id, var in self.button_file_vars.items():
             value = var.get().strip()
             if value:
-                # If older config stored full paths, migrate to filename
                 mappings[btn_id] = os.path.basename(value)
         return mappings
 
@@ -362,9 +352,6 @@ class App(tk.Tk):
     # Connect / Disconnect section
     # -------------------------------------------------------------------------
     def _create_control_section(self):
-        """
-        Creates the bottom control section with Connect/Disconnect buttons.
-        """
         frame = ttk.Frame(self)
         frame.pack(fill="x", padx=10, pady=5)
 
@@ -375,9 +362,6 @@ class App(tk.Tk):
         self.disconnect_btn.pack(side="left", padx=5, pady=5)
 
     def _on_click_connect(self):
-        """
-        Handles the Connect button click.
-        """
         port = self.get_selected_port()
         if not port:
             messagebox.showwarning("No Port Selected", "Please select an Arduino port first.")
@@ -388,20 +372,15 @@ class App(tk.Tk):
             if not messagebox.askyesno("No Mappings", "No buttons are mapped to audio files. Connect anyway?"):
                 return
 
-        # Save last port in config
         self.config_data["last_port"] = port
         save_config(self.config_data)
 
-        # Call the external callback to actually start the serial listener
         if self._on_connect and self._on_connect(port, mappings):
             self.connected = True
             self.connect_btn.config(state="disabled")
             self.disconnect_btn.config(state="normal")
 
     def _on_click_disconnect(self):
-        """
-        Handles the Disconnect button click.
-        """
         if self._on_disconnect:
             self._on_disconnect()
 
@@ -413,21 +392,11 @@ class App(tk.Tk):
     # Helper for processing serial messages safely in the GUI thread
     # -------------------------------------------------------------------------
     def handle_serial_message(self, msg):
-        """
-        Schedules processing of a serial message in the Tkinter main thread.
-        This function can be called from any thread (e.g. serial listener).
-        """
         self.after(0, self._process_serial_message, msg)
 
     def _process_serial_message(self, msg):
-        """
-        This runs in the Tkinter main thread.
-        Right now it just logs; main.py will attach actual behavior.
-        """
         print(f"[GUI] Received from Arduino: {msg}")
 
     def _schedule_auto_refresh_files(self):
-        """Periodically refresh audio file lists so new files appear in dropdowns."""
         self._populate_all_combos()
-        self.after(2000, self._schedule_auto_refresh_files)  # every 2 seconds
-
+        self.after(2000, self._schedule_auto_refresh_files)

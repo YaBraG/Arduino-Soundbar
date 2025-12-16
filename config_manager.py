@@ -4,6 +4,8 @@ Handles saving/loading configuration such as:
 - number of buttons
 - which audio file is mapped to each button
 - last used COM port
+- toggle button id (optional)
+- stop mode (SAME vs ANY)
 """
 
 import json
@@ -41,36 +43,36 @@ def load_config():
     """
     path = get_config_path()
 
+    default_config = {
+        "audio_folder": "",
+        "num_buttons": 4,
+        "button_files": {},          # key: "BTN1", value: "filename.wav"
+        "last_port": "",
+        "toggle_button_id": "",      # e.g. "BTN10" or "" (disabled)
+        "stop_mode": "SAME"          # "SAME" or "ANY"
+    }
+
     if not os.path.isfile(path):
-        # Default configuration
-        return {
-            "audio_folder": "",
-            "num_buttons": 4,
-            "button_files": {},  # key: "BTN1", value: "filename.wav"
-            "last_port": ""
-        }
+        return default_config
 
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception:
-        # If something goes wrong reading JSON, fallback to defaults
-        return {
-            "audio_folder": "",
-            "num_buttons": 4,
-            "button_files": {},
-            "last_port": ""
-        }
+        return default_config
 
-    # Make sure important keys exist
-    if "audio_folder" not in data:
-        data["audio_folder"] = ""
-    if "num_buttons" not in data:
-        data["num_buttons"] = 4
-    if "button_files" not in data:
-        data["button_files"] = {}
-    if "last_port" not in data:
-        data["last_port"] = ""
+    # Ensure required keys exist (migrate older configs)
+    for k, v in default_config.items():
+        if k not in data:
+            data[k] = v
+
+    # Validate stop_mode
+    if data.get("stop_mode") not in ("SAME", "ANY"):
+        data["stop_mode"] = "SAME"
+
+    # Validate toggle_button_id format (allow "" or "BTN<number>")
+    t = str(data.get("toggle_button_id", "")).strip()
+    data["toggle_button_id"] = t
 
     return data
 
