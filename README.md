@@ -1,10 +1,3 @@
-Perfect timing — here is a **clean, up-to-date README.md** that matches **v1.0.5**, the current behavior, and how you actually ship/test the project.
-
-You can **replace your README.md entirely** with this.
-
----
-
-````markdown
 # Arduino Soundbar
 
 Arduino Soundbar is a desktop application that turns an Arduino into a customizable soundboard.  
