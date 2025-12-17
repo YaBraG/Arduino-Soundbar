@@ -1,27 +1,99 @@
-Perfect timing — here is a **clean, up-to-date README.md** that matches **v1.0.5**, the current behavior, and how you actually ship/test the project.
+# Arduino Soundbar
 
-You can **replace your README.md entirely** with this.
+Arduino Soundbar is a desktop application that turns an Arduino into a configurable soundboard controller.  
+Physical buttons connected to an Arduino trigger audio files on a Windows PC with **low latency**, **fast retrigger**, and **reliable overlap behavior**.
+
+The project is designed to be simple, fast, and robust under rapid button presses.
 
 ---
 
-````markdown
-# Arduino Soundbar
+## 🧩 Project Overview
 
-Arduino Soundbar is a desktop application that turns an Arduino into a customizable soundboard.  
-Each Arduino button triggers an audio file on the PC with ultra-fast response, reliable overlap behavior, and flexible stop modes.
+**System flow:**
 
-Designed for **low latency**, **rapid retriggering**, and **stable multi-button playback**.
+Arduino → Serial (USB) → PC App → Audio Playback
+
+- Arduino sends button events (`BTN1`, `BTN2`, etc.)
+- PC app listens over serial
+- Each button triggers a mapped audio file
+- Playback behavior depends on the selected stop mode
 
 ---
 
 ## ✨ Features
 
-- 🎛️ Map Arduino buttons (BTN1, BTN2, etc.) to audio files
+- 🎛️ Map Arduino buttons to audio files
 - 🔊 True audio overlap across different buttons
-- ⚡ Fast retrigger on the same button (instant restart)
-- 🔁 Toggle between stop modes using a dedicated Arduino button
+- ⚡ Instant retrigger on the same button
+- 🔁 Toggle between stop modes using an Arduino button
 - 🖥️ Simple GUI for configuration
-- 📦 Standalone `.exe` build (no Python required for users)
+- 📦 Standalone Windows `.exe` for end users
+
+---
+
+## 🔌 Arduino Setup
+
+### Hardware
+- Any Arduino board with USB serial support (Uno, Nano, Mega, etc.)
+- Momentary push buttons wired to digital input pins
+- Internal pullups recommended
+
+Example wiring:
+- Button → Digital Pin
+- Other side → GND
+
+---
+
+### Arduino Firmware (Concept)
+
+The Arduino **only sends text messages over serial** when buttons are pressed.
+
+Example messages:
+```
+
+BTN1
+BTN2
+BTN3
+TOGGLE
+
+```
+
+> The PC application does **not** control the Arduino — it only listens.
+
+Basic logic:
+- Detect button press
+- Send a single line over `Serial.println()`
+
+Debouncing can be done either:
+- In Arduino code (recommended), or
+- On the hardware side
+
+---
+
+## 🔄 Serial Protocol
+
+- Baud rate: **9600** (default)
+- Line-based messages (`\n`)
+- Messages are case-sensitive by convention
+
+### Button Messages
+```
+
+BTN1
+BTN2
+BTN3
+...
+
+```
+
+### Toggle Message
+```
+
+TOGGLE
+
+````
+
+The toggle message switches playback modes on the PC.
 
 ---
 
@@ -32,24 +104,25 @@ The app supports two playback modes:
 ### SAME (Overlap Mode)
 - Pressing the **same button** restarts its sound
 - Pressing **different buttons** allows sounds to overlap
-- Best for soundboards and layered effects
+- Ideal for soundboards and layered effects
 
 ### ANY (Exclusive Mode)
 - Any button press stops all currently playing audio
 - Only one sound plays at a time
 
-### Toggle Button
+### Toggle Button Behavior
 - A dedicated Arduino button can toggle between `SAME` and `ANY`
 - **Pressing the toggle button immediately stops all audio** (v1.0.5)
 
 ---
 
-## 🔊 Audio Engine (Important)
+## 🔊 Audio Engine Details
 
 - Uses `pygame.mixer`
-- Each button is assigned a **dedicated audio channel**
-- Prevents channel stealing and random cutoffs under rapid presses
-- Audio files are cached for instant replay
+- Each Arduino button is assigned a **dedicated audio channel**
+- Prevents random cutoffs caused by pygame channel stealing
+- Audio files are cached in memory for instant replay
+- Mixer pre-allocates channels for stability under rapid presses
 
 Supported formats depend on pygame (commonly `.wav`, `.mp3`, `.ogg`).
 
@@ -58,19 +131,20 @@ Supported formats depend on pygame (commonly `.wav`, `.mp3`, `.ogg`).
 ## 🧪 Tested Scenarios
 
 - Rapidly spamming the same button
-- Rapidly alternating between two buttons
-- Holding one button while spamming another
-- Toggling modes during playback
+- Alternating between two or more buttons
+- Holding one button while pressing others
+- Toggling modes while audio is playing
 
-All tested scenarios behave deterministically as of **v1.0.5**.
+All scenarios behave deterministically as of **v1.0.5**.
 
 ---
 
 ## 🖥️ Running from Source (Developers)
 
 ### Requirements
+- Windows
 - Python 3.10+
-- Windows (pygame + winsound fallback)
+- USB-connected Arduino
 
 Install dependencies:
 ```powershell
@@ -87,7 +161,7 @@ python main.py
 
 ## 📦 Building the EXE (Windows)
 
-Clean build + icon:
+Clean build with icon:
 
 ```powershell
 pyinstaller --noconfirm --clean --onefile --noconsole `
@@ -102,7 +176,7 @@ After building:
 Copy-Item ".\icon.ico" ".\dist\icon.ico" -Force
 ```
 
-Output:
+Final output:
 
 ```
 dist/
@@ -138,17 +212,18 @@ dist/
 
 * `dist/` and `build/` folders are **not committed** to GitHub
 * `.exe` files are distributed via **GitHub Releases**
-* Arduino firmware only needs to send `BTN#` messages over serial
+* Arduino firmware is intentionally minimal and customizable
 
 ---
 
 ## 📬 Feedback & Testing
 
-If something breaks:
+When reporting issues, include:
 
-* Note which button(s)
+* Button pressed (`BTN#`)
 * Stop mode (`SAME` / `ANY`)
 * Audio format
-* Whether the toggle button was involved
+* Whether the toggle button was used
+* Whether running from source or `.exe`
 
-This helps isolate timing or hardware edge cases quickly.
+This helps isolate edge cases quickly.
